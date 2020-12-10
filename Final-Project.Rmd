@@ -1,0 +1,268 @@
+---
+title: "STAT 153 Project"
+author: "Yewen Zhou"
+date: "11/24/2020"
+output: 
+        bookdown::pdf_document2:
+                fig_caption: yes
+                toc: false
+header-includes:
+- \usepackage{float}
+- \usepackage{graphicx}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+```{r, include=FALSE}
+library("astsa")
+library("FitARMA")
+library("forecast")
+library("knitr")
+```
+# Executive Summary
+
+The Covid-19 dataset exhibits a pattern of quadratic trend and seasonality with a heteroskedastic behavior. We use log VST to minimize its heteroskedasicity. To pursue stationarity, we use two different approaches of parametric form and differencing. In both cases, we use periodograms to speculate possible frequencies and validate our model. With no clear "spikes" left in our residual (or filtered) plots, we have captured the trend and seasonality in the original data. 
+
+
+# Exploratory Data Analysis
+
+In the Covid dataset, marked by the plot on the left of Figure \ref{fig:EDA}, the number of new cases appears to be quadratically related with days. By plotting the periodogram of the data, it is shown that there are conspicuous seasonal components in the data at Fourier frequencies of 1/60, and 9/60. Additionally, the data appears to be heteroskedastical - the variance increases linearly with the mean.
+
+```{r EDA, echo=FALSE, fig.cap="Covid-19 Cases and Periodogram", fig.align = 'center', fig.height=4, fig.width = 8, out.width = '90%'}
+covid <- read.csv('projectdata_covid.csv')
+# plot 
+days <- time(covid$Date)
+layout(matrix(c(1,2),ncol=2))
+plot(days, covid$New.Cases, type="l", ylab="New Cases", xlab="Days", main="Covid data")
+pgram <- function(x, title){
+  m <- floor(length(x)/2)
+  pgram <- abs(fft(x)[2:(m+1)])^2/length(x)
+  plot(pgram, type = "h", xlab="j/n", ylab="", main=title)
+  abline(h=0)
+}
+pgram(covid$New.Cases, "Periodogram of the Covid data")
+```
+
+# Models Considered
+
+To model the natural signal in this data, both a parametric model and a differencing approach are used. The remaining stationary "noise" will be addressed in future iterations of this report using ARMA models. 
+
+## Parametric Signal Model
+
+First, the heteroskedacity is addressed by applying a log VST (Variance Stabalizing Tranform) on the Covid data. Then, the spectral density of the transformed data is plotted, which shows seasonal components at frequencies of 5/60, 8/60, 9/60, and 17/60. These information leads to a parametric signal model with quadratic trend and sinusoids at frequencies as above. The relevant plots are shown in Figure \ref{fig:signal-1}.
+```{r signal-1, echo=FALSE, fig.cap='Parametric signal model fit, residuals, and periodograms', fig.align='center', fig.pos="H", out.width="80%"}
+# first use a log transform
+logY <- log(covid$New.Cases)
+# speculate possible frequency using pgram 
+# look at pgram and select frequency 
+# plot a two-by-two diagram 
+par(mfrow=c(2, 2))
+mvspec(logY, main="Spectral Density of Log(Y)", xlab="Frequency", ylab="")
+abline(v=c(5/60, 8/60, 9/60, 17/60), col="red")
+n <- nrow(covid)
+cos1 <- cos(2*pi*days*5/n); sin1 <- sin(2*pi*days*5/n)
+cos8 <- cos(2*pi*days*8/n); sin8 <- sin(2*pi*days*8/n)
+cos9 <- cos(2*pi*days*9/n); sin9 <- sin(2*pi*days*9/n)
+cos17 <- cos(2*pi*days*17/n); sin17 <- sin(2*pi*days*17/n)
+model1 <- lm(logY ~ days + I(days^2) + cos1 + sin1 + cos8 + sin8 + cos9 + sin9 + cos17 + sin17)
+plot(days, logY, type = "l", xlab="Days", ylab = "Covid New Cases in log Scale", main="Fitted Model")
+# plot the fitted data 
+lines(days,model1$fitted.values,lwd=2,col="green")
+# plot the residuals 
+plot(days, model1$residuals, type="l", xlab="Days", ylab="Residuals", main="Residuals of Parametric Model")
+# inspect residuals to see if there are any other frequency left
+mvspec(model1$residuals, main="Spectral Density of Residuals", xlab="Frequency", ylab="")
+```
+
+It can be seen from the plots that the model fits the transformed data well. Furthermore, the residuals appears to be stationary with a constant mean around 0 and a constant variance. The spectral density plot of residuals confirms that major seasonal components have been captured.
+
+### Parametric signal + ARMA(0,0)
+The ACF and PACF plots for the parametric model residuals are shown in Figure \ref{fig:acf-pacf-signal-1}. Because there are no lags with ACF/PACF magnitudes beyond the 95% confidence bands, the residuals is likely to be white noise. Thus, ARMA(0,0) is proposed, and this model implies the ACF and PACF indicated by the blue circles in Figure \ref{fig:acf-pacf-signal-1}, which fit the general pattern of the sample autocorrelations.
+```{r, echo=FALSE, fig.show="hide", results="hide"}
+residuals1 <- model1$residuals
+# model 1.1 is parametric signal + ARMA(0,0)
+model1_1 <- sarima(residuals1, p=0, d=0, q=0, P=0, D=0, Q=0)
+model1_2 <- sarima(residuals1, p=0, d=0, q=1, P=0, D=0, Q=0)
+```
+
+
+```{r acf-pacf-signal-1, echo=FALSE, results="hide", fig.cap="Autocorrelation function (ACF) and partial autocorrelation function (PACF) values for the parametric signal model's residuals. Blue circles reflect the ARMA(0,0) model, while the orange circles reflect the ARMA(0,1) model.", fig.align = 'center', fig.pos="H", fig.height=3, fig.width = 8, out.width="80%"}
+layout(matrix(c(1,2),ncol=2))
+lags <- 25
+acf(model1$residuals, main="ACF of Residuals", lag.max=lags)
+model1_1_acf <- ARMAacf(ar=0, ma=0, lag.max=lags)
+model1_2_acf <- ARMAacf(ar=0, ma=model1_2$fit$coef[1], lag.max=lags)
+points(0:lags, model1_1_acf, col="blue")
+points(0:lags, model1_2_acf, col="orange")
+pacf(model1$residuals, main="PACF of Residuals", lag.max=25)
+model1_1_pacf <- ARMAacf(ar=0, ma=0, lag.max=lags, pacf = TRUE)
+model1_2_pacf <- ARMAacf(ar=0, ma=model1_2$fit$coef[1], lag.max=lags, pacf = TRUE)
+points(1:lags, model1_1_pacf, col="blue")
+points(1:lags, model1_2_pacf, col="orange")
+```
+
+### Parametric signal + ARMA(0,1)
+Since there is no evidence for anything other than the white noise, the second model is selected as MA(1) with its theoretical ACF/PACF values shown as orange circles in Figure \ref{fig:acf-pacf-signal-1}. This model captures the magnitude of ACF at lag=1 and the magnitude of PACF at lag=2 better than the first suggested model, thus appearing to be a better fit.
+
+## Differencing
+In addition to fitting a parametric model on the signal, differencing is also considered. The periodogram of the log transformed data shows seasonal components at frequencies of 8/60 and 9/60, which correspond to periods at 60/8=7.5 and 60/9=6.67. This might occur due to leakage where the true period is 7. Furthermore, to remove the quadratic trend in the tranformed data, a second differencing with lag=1 is applied after the first differencing at lag=7.
+```{r signal-2, echo=FALSE, results='hide', fig.cap='Differencing model and periodogram.',  fig.align = 'center', fig.pos="H", fig.height=2.5, out.width="80%"}
+layout(matrix(c(1,2),ncol=2))
+pgram(logY, "Periodogram of Log(Y)")
+sea_seven = diff(diff(logY, lag=7))
+plot(sea_seven, type="l", xlab="Days", ylab="Difference of LogY", main="Differencing Model with Lags=7, 1")
+# plot the periodogram on the data 
+```
+From Figure \ref{fig:signal-2}, we see that after differencing, the data appears to be stationary with a constant mean around 0 and a constant variance. Although there appears to be seasonal components in the filtered data, it is not deterministic.
+
+
+### Differencing + MSARMA(0,1)x(0,1)[7]
+The ACF and PACF for differenced data are shown in Figure \ref{fig:acf-pacf-signal-2}.
+
+
+```{r, echo=FALSE, fig.show = 'hide', results='hide', fig.align = 'center', fig.pos="H"}
+# auto.arima(sea_seven)
+model2_1 <- sarima(sea_seven, p=0,d=0,q=1,P=0,D=0,Q=1,S=7)
+model2_2 <- sarima(sea_seven, p=1,d=0,q=0,P=1,D=0,Q=0,S=7)
+```
+
+```{r acf-pacf-signal-2, echo=FALSE, results="hide", fig.cap="ACF and PACF of differencing model", fig.align='center', fig.pos='H', out.width="80%", fig.height=4, fig.width = 8}
+layout(matrix(c(1, 2), ncol=2))
+lags <- 25
+acf(sea_seven, main="ACF of Residuals", lag.max = lags)
+model2_1_acf <- ARMAacf(ma=c(model2_1$fit$coef[1], rep(0, 5),
+                              model2_1$fit$coef[2],
+                             model2_1$fit$coef[1]*model2_1$fit$coef[2]), lag.max = lags)
+model2_2_acf <- ARMAacf(ar=c(model2_2$fit$coef[1], rep(0, 5),
+                              model2_2$fit$coef[2],
+                             model2_2$fit$coef[1]*model2_1$fit$coef[2]), lag.max = lags)
+points(0:lags, model2_1_acf, col="blue")
+points(0:lags, model2_2_acf, col="orange")
+pacf(sea_seven, main="PACF of Residuals")
+model2_1_pacf <- ARMAacf(ma=c(model2_1$fit$coef[1], rep(0, 5),
+                              model2_1$fit$coef[2],
+                             model2_1$fit$coef[1]*model2_1$fit$coef[2]),
+                         lag.max = lags, pacf = TRUE)
+model2_2_pacf <- ARMAacf(ar=c(model2_2$fit$coef[1], rep(0, 5),
+                              model2_2$fit$coef[2],
+                             model2_2$fit$coef[1]*model2_2$fit$coef[2]),
+                         lag.max = lags, pacf = TRUE)
+points(1:lags, model2_1_pacf, col="blue")
+points(1:lags, model2_2_pacf, col="orange")
+```
+The plots show that the magnitudes of ACF and PACF beyond the 95% confidence band occur at lag=1 and lag=7. The former magnitude at lag=1 suggests a possible ARMA model with q=1, the latter magnitude at lag=7 suggests a possible seasonal MA component with S=7 and Q=1. Based on the above observations, MSARMA(0,1)$\times$(0,1)[7] is proposed. The theoretical ACF and PACF values is plotted as blue circles in Figure \ref{fig:acf-pacf-signal-2}. These circles show that this model captures the general pattern of ACF and PACF well especially at lag=1 and lag=7, which indicates that it is a good fit.
+
+
+### Differencing with MSARMA(1,0)x(1,0)[7]
+To address the magnitude in PACF at lag=7, a possible seasonal AR component is also considered with P=1 and S=7. To address the magnitude in PACF at lag=1, p is chosen to be 1. Thus, MSARMA(1,0)$\times$(1,0) is proposed. The fit of this model is shown as orange circles in Figure \ref{fig:acf-pacf-signal-2}. Clearly, this model failed to capture the general pattern and didn't fit sample autocorrelations as well as the first suggested model.
+
+
+# Model Comparison and Selection
+```{r, fig.show='hide', results="hide"}
+data <- logY
+sum_squared_errors <- c(model1=0, model2=0, model3=0, model4=0)
+for (i in 40:50) {
+        # split the training set and the test set 
+        train <- window(data, end=i)
+        test <- window(data, start=i+0.01, end=i+10)
+        n <- 60
+        cos1 <- cos(2*pi*days[1:i]*1/n); sin1 <- sin(2*pi*days[1:i]*1/n)
+        cos8 <- cos(2*pi*days[1:i]*8/n); sin8 <- sin(2*pi*days[1:i]*8/n)
+        cos9 <- cos(2*pi*days[1:i]*9/n); sin9 <- sin(2*pi*days[1:i]*9/n)
+        cos17 <- cos(2*pi*days[1:i]*17/n); sin17 <- sin(2*pi*days[1:i]*17/n)
+        cos1_t <- cos(2*pi*days[(i+0.01):(i+10)]*1/n)
+        sin1_t <- sin(2*pi*days[(i+0.01):(i+10)]*1/n)
+        cos8_t <- cos(2*pi*days[(i+0.01):(i+10)]*8/n)
+        sin8_t <- sin(2*pi*days[(i+0.01):(i+10)]*8/n)
+        cos9_t <- cos(2*pi*days[(i+0.01):(i+10)]*9/n)
+        sin9_t <- sin(2*pi*days[(i+0.01):(i+10)]*9/n)
+        cos17_t <- cos(2*pi*days[(i+0.01):(i+10)]*17/n)
+        sin17_t <- sin(2*pi*days[(i+0.01):(i+10)]*17/n)
+        model_train <- lm(train ~ days[1:i] + cos1 + sin1 + cos8 + sin8 + cos9 + sin9
+                + cos17 + sin17)
+        test_matrix <- model.matrix(~days[(i+0.001):(i+10)]
+                                   + cos1_t + sin1_t + cos8_t + sin8_t + sin9_t + cos9_t
+                + cos17_t + sin17_t)
+        # Parametric Signal + ARMA(0,0)
+        forecast1_1 <- test_matrix %*% model_train$coefficients +
+          sarima.for(model_train$residuals, n.ahead=10, p=0,d=0,q=0,P=0,D=0,Q=0,S=0)$pred
+        # Parametric Signal + ARMA(0,1)
+        forecast1_2 <- test_matrix %*% model_train$coefficients +
+          sarima.for(model_train$residuals, n.ahead=10, p=0,d=0,q=1,P=0,D=0,Q=0,S=0)$pred
+        # Differencing + MSARMA(0,1)x(0,1)[7]
+        forecast2_1 <- sarima.for(train, n.ahead=10, p=0,d=1,q=1,P=0,D=1,Q=1,S=7)$pred
+        # Differencing + MSARMA(1,0)x(1,0)[7]
+        forecast2_2 <- sarima.for(train, n.ahead=10, p=1,d=1,q=0,P=1, D=1,Q=0,S=7)$pred
+        # accumulat errors 
+        sum_squared_errors[1] <- sum_squared_errors[1] + sum((forecast1_1-test)^2)
+        sum_squared_errors[2] <- sum_squared_errors[2] + sum((forecast1_2-test)^2)
+        sum_squared_errors[3] <- sum_squared_errors[3] + sum((forecast2_1-test)^2)
+        sum_squared_errors[4] <- sum_squared_errors[4] + sum((forecast2_2-test)^2)
+}
+```
+
+```{r rmsetable}
+#RMSE table
+rmse <- matrix(sqrt(sum_squared_errors/10), nrow=4,ncol = 1)
+colnames(rmse) <- "RMSPE"
+rownames(rmse) <- c(
+        "Parametric Model + ARMA(0,0)",
+        "Parametric Model + ARMA(0,1)",
+        "SARIMA(q=1,d=1,D=1,Q=1,S=7)",
+        "SARIMA(p=1,d=1,D=1,P=1,S=7)"
+        )
+knitr::kable(rmse,caption = "Cross-validated out-of-sample root mean squared prediction error for the four models under consideration.")
+```
+Using cross-validation that rolls through data from time stamp=40 to 50, each time forecasting the data in the next 10 days with root-mean-square prediction error, RMSPE, we have the following table \ref{tab:rmsetable}. It shows that the SARIMA(q=1,d=1,D=1,Q=1,S=7) model noise is the best overall according to this cross-validation exercise, and therefore this model will be used for forecasting.
+
+
+# Results
+Model:
+$$
+\begin{aligned}
+X_t &= log(Z_t)\\
+Y_t &= \nabla_7^1 \nabla^1 X_t\\
+&= \nabla_7^1 (X_t - X_{t-1})\\
+&= X_t - X_{t-7} - X_{t-1} + X_{t-8}\\
+\end{aligned}
+$$
+Where $Z_t$ is the raw Covid data, $X_t$ is the log transformed data, $Y_t$ is the filtered data after applying differencing.
+
+MSARMA(0,1)$\times$(0,1)[7] Model:
+$$
+\begin{aligned}
+X_t &= \Theta(B^7) \theta(B) W_t\\
+&= (1 + \Theta B^7)(1 + \theta B)W_t\\
+&= (1 + \Theta B^7)(W_t + \theta W_{t-1})\\
+&= W_t + \theta W_{t-1} + \Theta W_{t-7} + \Theta \theta W_{t-8}\\
+\end{aligned}
+$$
+Where $W_t$ is white noise process, $B$ is the backshift operator, $\Theta$ is SMA parameter, and $\theta$ is the MA parameter.
+
+## Estimation of model parameters
+Estimates for model SARIMA(0,1,1,0,1,1)[7] parameters: 
+```{r, fig.align = 'center', fig.pos = 'H'}
+kable(model2_1$ttable[,1:2])
+```
+## Prediction 
+```{r, echo = FALSE, results="hide", fig.show = "hide"}
+#prediction table
+prediction <- matrix(nrow=2,ncol = 10)
+prediction[1,] <- exp(1)^sarima.for(xdata=logY, n.ahead=10, p=0,d=1,q=1,P=0,D=1,Q=1,S=7)$pred
+prediction[2,] <- exp(1)^sarima.for(xdata=logY, n.ahead=10, p=0,d=1,q=1,P=0,D=1,Q=1,S=7)$se
+colnames(prediction) <- c("61", "62", "63", "64", "65", "66", "67", "68", "69", "70")
+rownames(prediction) <- c("Prediction", "Standard Error")
+```
+```{r pred-table, echo = FALSE, fig.show = 'hide', results = 'hide'}
+knitr::kable(prediction,caption = "Prediction on 10 future data with log scale")
+```
+
+```{r final-pred, echo = FALSE, fig.cap = 'Covid with Prediction', fig.align = 'center', fig.pos = 'H', out.width = '70%', fig.height = 3}
+plot(covid$New.Cases, xlab="Days", ylab="New cases", type="l", xlim=c(0,70), lwd = 2)
+lines(x=61:70, y=prediction[1,], type='l', col="blue", lwd = 2)
+# lines(x=61:70, y=prediction[1,]+2*prediction[2,], type="l", col="orange", lwd = 2)
+# lines(x=61:70, y=prediction[1,]-2*prediction[2,], type="l", col="yellow", lwd = 2)
+```
+
+The Covid raw data along with the prediction is plotted as Figure \ref{fig:final-pred}.
