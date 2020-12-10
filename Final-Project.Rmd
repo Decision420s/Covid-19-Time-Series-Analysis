@@ -28,7 +28,7 @@ The number of new cases of Covid is expected to follow a cyclic pattern in the n
 
 # Exploratory Data Analysis
 
-In the Covid dataset, marked by the plot on the left of Figure \ref{fig:EDA}, the number of new cases appears to be quadratically related with days. By plotting the periodogram of the data, it is shown that there are conspicuous seasonal components in the data at Fourier frequencies of 1/60, and 9/60. Additionally, the data appears to be heteroskedastical - the variance increases linearly with the mean.
+In the Covid data, marked on the left in Figure \ref{fig:EDA}, the number of new cases appears to have a quadratic relationship with the time. By plotting the periodogram of the data, it is shown that there are seasonal components at frequencies of 1/60, 8/60, and 9/60. Since the periods 60/8 and 60/9 are not integers, this might happen due to leakage. Additionally, there appears to be heteroskedasticity in the data. The standard deviation appears to be increasing linearly with the mean, so the variance appears to be increasing quadratically with the mean.
 
 ```{r EDA, echo=FALSE, fig.cap="Covid-19 Cases and Periodogram", fig.align = 'center', fig.height=4, fig.width = 8, out.width = '90%'}
 covid <- read.csv('projectdata_covid.csv')
@@ -51,19 +51,19 @@ To model the natural signal in this data, both a parametric model and a differen
 
 ## Parametric Signal Model
 
-First, the heteroskedacity is addressed by applying a log VST (Variance Stabalizing Tranform) on the Covid data. Then, the spectral density of the transformed data is plotted, which shows seasonal components at frequencies of 5/60, 8/60, 9/60, and 17/60. These information leads to a parametric signal model with quadratic trend and sinusoids at frequencies as above. This deterministic model is detailed in the equation below, where $X_t$ is the additive noise term.
+First, the heteroskedasticity is addressed by applying a log VST (Variance Stabalizing Tranform) on the Covid data. Then, the spectral density of the transformed data is plotted, which shows seasonal components at frequencies of 5/60, 8/60, 9/60, and 17/60. These information leads to a parametric signal model with quadratic trend and sinusoids at frequencies as above. This deterministic model is detailed in the equation below, where $X_t$ is the additive noise term.
 
 $$
 \begin{aligned}
-log(\text{Covid}_t) &= \beta_0 + \beta_1 t + \beta_2 t^2 + \beta_3 cos(\frac{2 \pi 5 t}{60}) + \beta_4 sin(\frac{2 \pi 5 t}{60}) + \beta_5 cos(\frac{2 \pi 8 t}{60}) \\
-&+ \beta_6 cos(\frac{2 \pi 8 t}{60}) + \beta_7 cos(\frac{2 \pi 9 t}{60}) + \beta_8 cos(\frac{2 \pi 9 t}{60}) + \beta_9 cos(\frac{2 \pi 17 t}{60}) + \beta_{10} cos(\frac{2 \pi 17 t}{60}) + X_t \notag
+log(\text{Covid}_t) &= \beta_0 + \beta_1 t + \beta_2 t^2 + \beta_3 cos(\frac{10 \pi t}{60}) + \beta_4 sin(\frac{10 \pi t}{60}) + \beta_5 cos(\frac{16 \pi t}{60}) \\
+&+ \beta_6 sin(\frac{16 \pi t}{60}) + \beta_7 cos(\frac{18 \pi t}{60}) + \beta_8 sin(\frac{18 \pi t}{60}) + \beta_9 cos(\frac{34 \pi t}{60}) + \beta_{10} sin(\frac{34 \pi t}{60}) + X_t \notag
 (\#eq:param-equation)
 \end{aligned}
 $$
 
-Figure \ref{fig:signal-1} presents relevant plots including Spectral density of transformed data, the fitted model, residuals, and the Spectral density of residuals.
+Figure \ref{fig:signal-1} presents relevant plots including the spectral density of transformed data, the fitted model, residuals, and the spectral density of residuals.
 
-```{r signal-1, echo=FALSE, fig.cap='Spectral Density of the log transform of Covid data, Fitted Model, Residuals, and Spectral Density of Residuals', fig.align='center', fig.pos="H", out.width="80%"}
+```{r signal-1, echo=FALSE, fig.cap='Spectral Density log(Covid), Fitted Model, Residuals, and Spectral Density of Residuals', fig.align='center', fig.pos="H", out.width="80%"}
 # first use a log transform
 logY <- log(covid$New.Cases)
 # speculate possible frequency using pgram 
@@ -234,8 +234,8 @@ To forecast Covid new cases in next 10 days, a differencing model will be used. 
 $$
 \begin{aligned}
 X_t &= log(Z_t)\\
-Y_t &= \nabla_7^1 \nabla^1 X_t\\
-&= \nabla_7^1 (X_t - X_{t-1})\\
+Y_t &= \nabla_7 \nabla X_t\\
+&= \nabla_7 (X_t - X_{t-1})\\
 &= X_t - X_{t-7} - X_{t-1} + X_{t-8}\\
 \end{aligned}
 $$
@@ -251,7 +251,14 @@ $\theta$, $\Theta$ are coefficients which will be estimated in the next subsecti
 ## Estimation of model parameters
 Estimates of the model parameters are given in Table \ref{tab:estimatetable}.
 ```{r estimatetable}
-x <- kable(model2_1$ttable[,1:2], caption = 'Model Estimates')
+x <- matrix(nrow = 3, ncol = 3)
+colnames(x) <- c("Estimate", "SE", "Coefficient Description")
+rownames(x) <- c("$\\theta$", "$\\Theta$", "$\\sigma_M^2$")
+x[3,1] <- model2_1$fit$sigma2
+x[3,2] <- ""
+x[,3] <- c("MA coefficient", "Seasonal MA coefficient", "Variance of White Noise")
+x[1:2,1:2] <- model2_1$ttable[1:2,1:2]
+x <- kable(x, caption = 'Model Estimates', escape = FALSE)
 kable_styling(x, position = 'center', latex_options = 'HOLD_position')
 ```
 ## Prediction
