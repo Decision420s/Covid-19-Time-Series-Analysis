@@ -19,6 +19,7 @@ library("astsa")
 library("FitARMA")
 library("forecast")
 library("knitr")
+library("kableExtra")
 ```
 # Executive Summary
 
@@ -87,7 +88,7 @@ model1_2 <- sarima(residuals1, p=0, d=0, q=1, P=0, D=0, Q=0)
 ```
 
 
-```{r acf-pacf-signal-1, echo=FALSE, results="hide", fig.cap="Autocorrelation function (ACF) and partial autocorrelation function (PACF) values for the parametric signal model's residuals. Blue circles reflect the ARMA(0,0) model, while the orange circles reflect the ARMA(0,1) model.", fig.align = 'center', fig.pos="H", fig.height=3, fig.width = 8, out.width="80%"}
+```{r acf-pacf-signal-1, echo=FALSE, results="hide", fig.cap="Autocorrelation function (ACF) and partial autocorrelation function (PACF) values for the parametric signal model's residuals. Blue circles reflect the ARMA(0,0) model, while the orange circles reflect the ARMA(0,1) model.", fig.align = 'center', fig.pos="H", fig.height=4, fig.width = 8, out.width="80%"}
 layout(matrix(c(1,2),ncol=2))
 lags <- 25
 acf(model1$residuals, main="ACF of Residuals", lag.max=lags)
@@ -107,7 +108,7 @@ Since there is no evidence for anything other than the white noise, the second m
 
 ## Differencing
 In addition to fitting a parametric model on the signal, differencing is also considered. The periodogram of the log transformed data shows seasonal components at frequencies of 8/60 and 9/60, which correspond to periods at 60/8=7.5 and 60/9=6.67. This might occur due to leakage where the true period is 7. Furthermore, to remove the quadratic trend in the tranformed data, a second differencing with lag=1 is applied after the first differencing at lag=7.
-```{r signal-2, echo=FALSE, results='hide', fig.cap='Differencing model and periodogram.',  fig.align = 'center', fig.pos="H", fig.height=2.5, out.width="80%"}
+```{r signal-2, echo=FALSE, results='hide', fig.cap='Differencing model and periodogram.',  fig.align = 'center', fig.pos="H", fig.height=3, out.width="80%"}
 layout(matrix(c(1,2),ncol=2))
 pgram(logY, "Periodogram of Log(Y)")
 sea_seven = diff(diff(logY, lag=7))
@@ -202,7 +203,8 @@ for (i in 40:50) {
 }
 ```
 
-```{r rmsetable}
+Using cross-validation that rolls through data from time stamp=40 to 50, each time forecasting the data in the next 10 days with root-mean-square prediction error, RMSPE, we have the following table \ref{tab:rmsetable}. It shows that the SARIMA(q=1,d=1,D=1,Q=1,S=7) model noise is the best overall according to this cross-validation exercise, and therefore this model will be used for forecasting.
+```{r rmsetable, fig.pos = 'H', fig.align = 'center'}
 #RMSE table
 rmse <- matrix(sqrt(sum_squared_errors/10), nrow=4,ncol = 1)
 colnames(rmse) <- "RMSPE"
@@ -212,10 +214,9 @@ rownames(rmse) <- c(
         "SARIMA(q=1,d=1,D=1,Q=1,S=7)",
         "SARIMA(p=1,d=1,D=1,P=1,S=7)"
         )
-knitr::kable(rmse,caption = "Cross-validated out-of-sample root mean squared prediction error for the four models under consideration.")
+rmse <- kable(rmse,caption = "Cross-validated out-of-sample root mean squared prediction error for the four models under consideration.")
+kable_styling(rmse, position = 'center', latex_options = 'HOLD_position')
 ```
-Using cross-validation that rolls through data from time stamp=40 to 50, each time forecasting the data in the next 10 days with root-mean-square prediction error, RMSPE, we have the following table \ref{tab:rmsetable}. It shows that the SARIMA(q=1,d=1,D=1,Q=1,S=7) model noise is the best overall according to this cross-validation exercise, and therefore this model will be used for forecasting.
-
 
 # Results
 Model:
@@ -242,8 +243,9 @@ Where $W_t$ is white noise process, $B$ is the backshift operator, $\Theta$ is S
 
 ## Estimation of model parameters
 Estimates for model SARIMA(0,1,1,0,1,1)[7] parameters: 
-```{r, fig.align = 'center', fig.pos = 'H'}
-kable(model2_1$ttable[,1:2])
+```{r}
+x <- kable(model2_1$ttable[,1:2])
+kable_styling(x, position = 'center', latex_options = 'HOLD_position')
 ```
 ## Prediction 
 ```{r, echo = FALSE, results="hide", fig.show = "hide"}
