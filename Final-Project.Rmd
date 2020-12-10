@@ -17,10 +17,18 @@ knitr::opts_chunk$set(echo = FALSE)
 ```
 ```{r, include=FALSE}
 library("astsa")
-library("FitARMA")
 library("forecast")
 library("knitr")
 library("kableExtra")
+library("FitAR")
+`LBQPlot` <- function(res, lag.max=30, StartLag=k+1, k=0, SquaredQ=FALSE, title){
+stopifnot(k>=0, lag.max-StartLag>0, length(res)>lag.max)
+ans<-LjungBoxTest(res, k=k, lag.max=lag.max, StartLag=StartLag, SquaredQ=FALSE)
+m <- ans[,"m"]
+pv <- ans[,"pvalue"]
+plot(m, pv, xlab="lag", ylab="p-value", ylim=c(0,1), main=title)
+abline(h=0.05, col="red", lty=2)
+}
 ```
 # Executive Summary
 
@@ -90,7 +98,7 @@ mvspec(model1$residuals, main="Spectral Density of Residuals", xlab="Frequency",
 It can be seen from the plots that the model fits the transformed data well. Furthermore, the residuals appears to be stationary with a constant mean around 0 and a constant variance. The spectral density plot of residuals confirms that major seasonal components have been captured.
 
 ### Parametric signal + ARMA(0,0)
-The ACF and PACF plots for the parametric model residuals are shown in Figure \ref{fig:acf-pacf-signal-1}. Because there are no lags with ACF/PACF magnitudes beyond the 95% confidence bands, the residuals is likely to be white noise. Thus, ARMA(0,0) is proposed, and this model implies the ACF and PACF indicated by the blue circles in Figure \ref{fig:acf-pacf-signal-1}, which fit the general pattern of the sample autocorrelations.
+The ACF and PACF plots for the parametric model residuals are shown in Figure \ref{fig:acf-pacf-signal-1}. Because there are no lags with ACF/PACF magnitudes beyond the 95% confidence bands, the residuals is likely to be white noise. Thus, ARMA(0,0) is proposed, and this model implies the ACF and PACF indicated by the blue circles in Figure \ref{fig:acf-pacf-signal-1}, which fit the general pattern of the sample autocorrelations. The Ljung-Box Test of this model, marked on the bottom left in Figure \ref{fig:acf-pacf-signal-1}, shows that all p-values are above the rejection threshold, which implies that residuals is white noise and the model is a good fit.
 ```{r, echo=FALSE, fig.show="hide", results="hide"}
 residuals1 <- model1$residuals
 # model 1.1 is parametric signal + ARMA(0,0)
@@ -99,8 +107,8 @@ model1_2 <- sarima(residuals1, p=0, d=0, q=1, P=0, D=0, Q=0)
 ```
 
 
-```{r acf-pacf-signal-1, echo=FALSE, results="hide", fig.cap="Autocorrelation function (ACF) and partial autocorrelation function (PACF) values for the parametric signal model's residuals. Blue circles reflect the ARMA(0,0) model, while the orange circles reflect the ARMA(0,1) model.", fig.align = 'center', fig.pos="H", fig.height=4, fig.width = 8, out.width="80%"}
-layout(matrix(c(1,2),ncol=2))
+```{r acf-pacf-signal-1, echo=FALSE, results="hide", fig.cap="Autocorrelation function (ACF), partial autocorrelation function (PACF) values for the parametric signal model's residuals, and Ljung-Box Test of residuals for ARMA(0,0) and ARMA(0,1). Blue circles reflect the ARMA(0,0) model, while the orange circles reflect the ARMA(0,1) model.", fig.align = 'center', fig.pos="H", fig.height=6, fig.width = 8, out.width="80%"}
+par(mfrow = c(2, 2))
 lags <- 25
 acf(model1$residuals, main="ACF of Residuals", lag.max=lags)
 model1_1_acf <- ARMAacf(ar=0, ma=0, lag.max=lags)
@@ -112,10 +120,12 @@ model1_1_pacf <- ARMAacf(ar=0, ma=0, lag.max=lags, pacf = TRUE)
 model1_2_pacf <- ARMAacf(ar=0, ma=model1_2$fit$coef[1], lag.max=lags, pacf = TRUE)
 points(1:lags, model1_1_pacf, col="blue")
 points(1:lags, model1_2_pacf, col="orange")
+LBQPlot(model1_1$fit$residuals, title = "Ljung-Box Test of Residuals for ARMA(0,0)")
+LBQPlot(model1_2$fit$residuals, title = "Ljung-Box Test of Residuals for ARMA(0,1)")
 ```
 
 ### Parametric signal + ARMA(0,1)
-Since there is no evidence for anything other than the white noise, the second model is selected as MA(1) with its theoretical ACF/PACF values shown as orange circles in Figure \ref{fig:acf-pacf-signal-1}. This model captures the magnitude of ACF at lag=1 and the magnitude of PACF at lag=2 better than the first suggested model, thus appearing to be a better fit.
+Since there is no evidence for anything other than the white noise, the second model is selected as MA(1) with its theoretical ACF/PACF values shown as orange circles in Figure \ref{fig:acf-pacf-signal-1}. This model captures the magnitude of ACF at lag=1 and the magnitude of PACF at lag=2 better than the first suggested model. The Ljung-Box Test of this model, marked on the bottom right in Figure \ref{fig:acf-pacf-signal-1} shows that all p-values are above the rejection threshold, which suggests that the residuals after fitting ARMA(0,1) is likely to be white noise. Moreover, the p-values are higher than those in the first suggested model. These observations imples that ARMA(0,1) is a better fit.
 
 ## Differencing
 In addition to fitting a parametric model on the signal, differencing is also considered. The periodogram of the log transformed data shows seasonal components at frequencies of 8/60 and 9/60, which correspond to periods at 60/8=7.5 and 60/9=6.67. This might occur due to leakage where the true period is 7. Furthermore, to remove the quadratic trend in the tranformed data, a second differencing with lag=1 is applied after the first differencing at lag=7.
@@ -139,8 +149,9 @@ model2_1 <- sarima(sea_seven, p=0,d=0,q=1,P=0,D=0,Q=1,S=7)
 model2_2 <- sarima(sea_seven, p=1,d=0,q=0,P=1,D=0,Q=0,S=7)
 ```
 
-```{r acf-pacf-signal-2, echo=FALSE, results="hide", fig.cap="ACF and PACF of differencing model", fig.align='center', fig.pos='H', out.width="80%", fig.height=4, fig.width = 8}
-layout(matrix(c(1, 2), ncol=2))
+```{r acf-pacf-signal-2, echo=FALSE, results="hide", fig.cap="ACF, PACF of differencing model and Ljung-Box Test of residuals for MSARMA(0,1)x(0,1)[7] and MSARMA(1,0)x(1,0)[7]", fig.align='center', fig.pos='H', out.width="80%", fig.height=6, fig.width = 8}
+# layout(matrix(c(1, 2), ncol=2))
+par(mfrow = c(2, 2))
 lags <- 25
 acf(sea_seven, main="ACF of Residuals", lag.max = lags)
 model2_1_acf <- ARMAacf(ma=c(model2_1$fit$coef[1], rep(0, 5),
@@ -151,7 +162,7 @@ model2_2_acf <- ARMAacf(ar=c(model2_2$fit$coef[1], rep(0, 5),
                              model2_2$fit$coef[1]*model2_1$fit$coef[2]), lag.max = lags)
 points(0:lags, model2_1_acf, col="blue")
 points(0:lags, model2_2_acf, col="orange")
-pacf(sea_seven, main="PACF of Residuals")
+pacf(sea_seven, main="PACF of Residuals", lag.max = lags)
 model2_1_pacf <- ARMAacf(ma=c(model2_1$fit$coef[1], rep(0, 5),
                               model2_1$fit$coef[2],
                              model2_1$fit$coef[1]*model2_1$fit$coef[2]),
@@ -162,12 +173,14 @@ model2_2_pacf <- ARMAacf(ar=c(model2_2$fit$coef[1], rep(0, 5),
                          lag.max = lags, pacf = TRUE)
 points(1:lags, model2_1_pacf, col="blue")
 points(1:lags, model2_2_pacf, col="orange")
+LBQPlot(model2_1$fit$residuals, title = "LB Test of Residuals for MSARMA(0,1)x(0,1)[7]")
+LBQPlot(model2_2$fit$residuals, title = "LB Test of Residuals for MSARMA(1,0)x(1,0)[7]")
 ```
-The plots show that the magnitudes of ACF and PACF beyond the 95% confidence band occur at lag=1 and lag=7. The former magnitude at lag=1 suggests a possible ARMA model with q=1, the latter magnitude at lag=7 suggests a possible seasonal MA component with S=7 and Q=1. Based on the above observations, MSARMA(0,1)$\times$(0,1)[7] is proposed. The theoretical ACF and PACF values is plotted as blue circles in Figure \ref{fig:acf-pacf-signal-2}. These circles show that this model captures the general pattern of ACF and PACF well especially at lag=1 and lag=7, which indicates that it is a good fit.
+The plots show that the magnitudes of ACF and PACF beyond the 95% confidence band occur at lag=1 and lag=7. The former magnitude at lag=1 suggests a possible ARMA model with q=1, the latter magnitude at lag=7 suggests a possible seasonal MA component with S=7 and Q=1. Based on the above observations, MSARMA(0,1)$\times$(0,1)[7] is proposed. The theoretical ACF and PACF values is plotted as blue circles in Figure \ref{fig:acf-pacf-signal-2}. These circles show that this model captures the general pattern of ACF and PACF well especially at lag=1 and lag=7. The Ljung-Box Test of the residuals is shown on the bottom left in Figure \ref{fig:acf-pacf-signal-2}. It shows all p-values are not significant, which suggests that the residuals is white noise and the model is a good fit.
 
 
 ### Differencing with MSARMA(1,0)x(1,0)[7]
-To address the magnitude in PACF at lag=7, a possible seasonal AR component is also considered with P=1 and S=7. To address the magnitude in PACF at lag=1, p is chosen to be 1. Thus, MSARMA(1,0)$\times$(1,0) is proposed. The fit of this model is shown as orange circles in Figure \ref{fig:acf-pacf-signal-2}. Clearly, this model failed to capture the general pattern and didn't fit sample autocorrelations as well as the first suggested model.
+To address the magnitude in PACF at lag=7, a possible seasonal AR component is also considered with P=1 and S=7. To address the magnitude in PACF at lag=1, p is chosen to be 1. Thus, MSARMA(1,0)$\times$(1,0) is proposed. The fit of this model is shown as orange circles in Figure \ref{fig:acf-pacf-signal-2}. Clearly, this model failed to capture the general pattern and didn't fit sample autocorrelations as well as the first suggested model. The Ljung-Box Test for this model is plotted on the bottom right in Figure \ref{fig:acf-pacf-signal-2}. Although all p-values are not significant, they are lower than the values in the first suggested model. These observations concludes that MSARMA(1,0)x(1,0)[7] is not as a good fit as MSARMA(0,1)x(0,1)[7].
 
 
 # Model Comparison and Selection
@@ -262,7 +275,7 @@ x <- kable(x, caption = 'Model Estimates', escape = FALSE)
 kable_styling(x, position = 'center', latex_options = 'HOLD_position')
 ```
 ## Prediction
-Figure \ref{fig:final-pred} shows the forecast values of Covid new cases in next 10 days.
+Figure \ref{fig:final-pred} shows the forecast values of Covid new cases in next 10 days. The model predicts that the new cases will follow a cyclic pattern with a drop up to day 64, a rise up to day 66, then a drop up to day 70. The lowest point is expected to occur on day 64 with around 565 new cases, and the highest point is expected to occur on day 66 with around 1130 new cases. The trend will be slowly going upwards, which suggests that necessary measures should be taken to help reduce the spread of the virus.
 
 ```{r, echo = FALSE, results = 'hide', fig.show = 'hide', fig.cap = 'Forecasts of Covid new cases', fig.pos = 'H', fig.width = 8, fig.height = 4, out.width = '90%'}
 sarima.for(covid$New.Cases, n.ahead = 10, p=0,d=1,q=1,P=0,D=1,Q=1,S=7)$pred
