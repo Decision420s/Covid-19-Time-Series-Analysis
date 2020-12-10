@@ -24,8 +24,7 @@ library("kableExtra")
 ```
 # Executive Summary
 
-The Covid-19 dataset exhibits a pattern of quadratic trend and seasonality with a heteroskedastic behavior. We use log VST to minimize its heteroskedasicity. To pursue stationarity, we use two different approaches of parametric form and differencing. In both cases, we use periodograms to speculate possible frequencies and validate our model. With no clear "spikes" left in our residual (or filtered) plots, we have captured the trend and seasonality in the original data. 
-
+The number of new cases of Covid is expected to follow a cyclic pattern in the next 10 days with a drop around day 64, a rise around day 66, and a drop around day 70. According to our SARIMA(q=1,d=1,D=1,Q=1,S=7) model, the lowest point is expected to occur on day 64 with around 565 new cases, and the highest point is expected to occur on day 66 with around 1130 new cases. The model suggests that the situation of Covid does not look promising as the trend will continue to increase.
 
 # Exploratory Data Analysis
 
