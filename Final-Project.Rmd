@@ -9,6 +9,7 @@ output:
 header-includes:
 - \usepackage{float}
 - \usepackage{graphicx}
+- \usepackage{amsmath}
 ---
 
 ```{r setup, include=FALSE}
@@ -51,8 +52,19 @@ To model the natural signal in this data, both a parametric model and a differen
 
 ## Parametric Signal Model
 
-First, the heteroskedacity is addressed by applying a log VST (Variance Stabalizing Tranform) on the Covid data. Then, the spectral density of the transformed data is plotted, which shows seasonal components at frequencies of 5/60, 8/60, 9/60, and 17/60. These information leads to a parametric signal model with quadratic trend and sinusoids at frequencies as above. The relevant plots are shown in Figure \ref{fig:signal-1}.
-```{r signal-1, echo=FALSE, fig.cap='Parametric signal model fit, residuals, and periodograms', fig.align='center', fig.pos="H", out.width="80%"}
+First, the heteroskedacity is addressed by applying a log VST (Variance Stabalizing Tranform) on the Covid data. Then, the spectral density of the transformed data is plotted, which shows seasonal components at frequencies of 5/60, 8/60, 9/60, and 17/60. These information leads to a parametric signal model with quadratic trend and sinusoids at frequencies as above. This deterministic model is detailed in the equation below, where $X_t$ is the additive noise term.
+
+$$
+\begin{aligned}
+log(\text{Covid}_t) &= \beta_0 + \beta_1 t + \beta_2 t^2 + \beta_3 cos(\frac{2 \pi 5 t}{60}) + \beta_4 sin(\frac{2 \pi 5 t}{60}) + \beta_5 cos(\frac{2 \pi 8 t}{60}) \\
+&+ \beta_6 cos(\frac{2 \pi 8 t}{60}) + \beta_7 cos(\frac{2 \pi 9 t}{60}) + \beta_8 cos(\frac{2 \pi 9 t}{60}) + \beta_9 cos(\frac{2 \pi 17 t}{60}) + \beta_{10} cos(\frac{2 \pi 17 t}{60}) + X_t \notag
+(\#eq:param-equation)
+\end{aligned}
+$$
+
+Figure \ref{fig:signal-1} presents relevant plots including Spectral density of transformed data, the fitted model, residuals, and the Spectral density of residuals.
+
+```{r signal-1, echo=FALSE, fig.cap='Spectral Density of the log transform of Covid data, Fitted Model, Residuals, and Spectral Density of Residuals', fig.align='center', fig.pos="H", out.width="80%"}
 # first use a log transform
 logY <- log(covid$New.Cases)
 # speculate possible frequency using pgram 
@@ -262,7 +274,7 @@ rownames(prediction) <- c("Prediction", "Standard Error")
 knitr::kable(prediction,caption = "Prediction on 10 future data with log scale")
 ```
 
-```{r final-pred, echo = FALSE, results = 'hide', fig.cap = 'Forecasts of Covid new cases in next 10 days', fig.align = 'center', fig.pos = 'H', out.width = '90%', fig.height = 4, fig.width = 8}
+```{r final-pred, echo = FALSE, results = 'hide', fig.cap = 'Forecasts of Covid new cases in next 10 days', fig.align = 'center', fig.pos = 'H', fig.width = 8, out.width = '90%'}
 plot(covid$New.Cases, xlab="Days", ylab="New cases", type="l", xlim=c(0,70), lwd = 2)
 lines(x=61:70, y=prediction[1,], type='l', col="blue", lwd = 2)
 # lines(x=61:70, y=prediction[1,]+2*prediction[2,], type="l", col="orange", lwd = 2)
