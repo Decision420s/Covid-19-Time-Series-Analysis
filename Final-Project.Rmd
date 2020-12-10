@@ -279,3 +279,6 @@ lines(x=61:70, y=prediction[1,], type='l', col="blue", lwd = 2)
 # lines(x=61:70, y=prediction[1,]+2*prediction[2,], type="l", col="orange", lwd = 2)
 # lines(x=61:70, y=prediction[1,]-2*prediction[2,], type="l", col="yellow", lwd = 2)
 ```
+```{r, echo = FALSE, results = 'hide'}
+write.csv(prediction[1,], file = 'output.csv')
+```
