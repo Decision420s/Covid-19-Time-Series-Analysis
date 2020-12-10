@@ -108,7 +108,7 @@ Since there is no evidence for anything other than the white noise, the second m
 
 ## Differencing
 In addition to fitting a parametric model on the signal, differencing is also considered. The periodogram of the log transformed data shows seasonal components at frequencies of 8/60 and 9/60, which correspond to periods at 60/8=7.5 and 60/9=6.67. This might occur due to leakage where the true period is 7. Furthermore, to remove the quadratic trend in the tranformed data, a second differencing with lag=1 is applied after the first differencing at lag=7.
-```{r signal-2, echo=FALSE, results='hide', fig.cap='Differencing model and periodogram.',  fig.align = 'center', fig.pos="H", fig.height=3, out.width="80%"}
+```{r signal-2, echo=FALSE, results='hide', fig.cap='Differencing model and periodogram.',  fig.align = 'center', fig.pos="H", fig.height=4, fig.width = 8, out.width="80%"}
 layout(matrix(c(1,2),ncol=2))
 pgram(logY, "Periodogram of Log(Y)")
 sea_seven = diff(diff(logY, lag=7))
@@ -219,7 +219,7 @@ kable_styling(rmse, position = 'center', latex_options = 'HOLD_position')
 ```
 
 # Results
-Model:
+To forecast Covid new cases in next 10 days, a differencing model will be used. Let $Z_t$ be Covid new cases on day $t$, $X_t$ be the log transformed data, $Y_t$ be the filtered data after differencing. $W_t$ is white noise process with variance $\sigma_W^2$.
 $$
 \begin{aligned}
 X_t &= log(Z_t)\\
@@ -228,27 +228,29 @@ Y_t &= \nabla_7^1 \nabla^1 X_t\\
 &= X_t - X_{t-7} - X_{t-1} + X_{t-8}\\
 \end{aligned}
 $$
-Where $Z_t$ is the raw Covid data, $X_t$ is the log transformed data, $Y_t$ is the filtered data after applying differencing.
 
-MSARMA(0,1)$\times$(0,1)[7] Model:
 $$
 \begin{aligned}
-X_t &= \Theta(B^7) \theta(B) W_t\\
-&= (1 + \Theta B^7)(1 + \theta B)W_t\\
-&= (1 + \Theta B^7)(W_t + \theta W_{t-1})\\
-&= W_t + \theta W_{t-1} + \Theta W_{t-7} + \Theta \theta W_{t-8}\\
+Y_t &= W_t + \theta W_{t-1} + \Theta W_{t-7} + \Theta \theta W_{t-8}\\
 \end{aligned}
 $$
-Where $W_t$ is white noise process, $B$ is the backshift operator, $\Theta$ is SMA parameter, and $\theta$ is the MA parameter.
+$\theta$, $\Theta$ are coefficients which will be estimated in the next subsection.
+
 
 ## Estimation of model parameters
-Estimates for model SARIMA(0,1,1,0,1,1)[7] parameters: 
-```{r}
-x <- kable(model2_1$ttable[,1:2])
+Estimates of the model parameters are given in Table \ref{tab:estimatetable}.
+```{r estimatetable}
+x <- kable(model2_1$ttable[,1:2], caption = 'Model Estimates')
 kable_styling(x, position = 'center', latex_options = 'HOLD_position')
 ```
-## Prediction 
-```{r, echo = FALSE, results="hide", fig.show = "hide"}
+## Prediction
+Figure \ref{fig:final-pred} shows the forecast values of Covid new cases in next 10 days.
+
+```{r, echo = FALSE, results = 'hide', fig.show = 'hide', fig.cap = 'Forecasts of Covid new cases', fig.pos = 'H', fig.width = 8, fig.height = 4, out.width = '90%'}
+sarima.for(covid$New.Cases, n.ahead = 10, p=0,d=1,q=1,P=0,D=1,Q=1,S=7)$pred
+```
+
+```{r prediction, echo = FALSE, results="hide", fig.show = "hide"}
 #prediction table
 prediction <- matrix(nrow=2,ncol = 10)
 prediction[1,] <- exp(1)^sarima.for(xdata=logY, n.ahead=10, p=0,d=1,q=1,P=0,D=1,Q=1,S=7)$pred
@@ -260,11 +262,9 @@ rownames(prediction) <- c("Prediction", "Standard Error")
 knitr::kable(prediction,caption = "Prediction on 10 future data with log scale")
 ```
 
-```{r final-pred, echo = FALSE, fig.cap = 'Covid with Prediction', fig.align = 'center', fig.pos = 'H', out.width = '70%', fig.height = 3}
+```{r final-pred, echo = FALSE, results = 'hide', fig.cap = 'Forecasts of Covid new cases in next 10 days', fig.align = 'center', fig.pos = 'H', out.width = '90%', fig.height = 4, fig.width = 8}
 plot(covid$New.Cases, xlab="Days", ylab="New cases", type="l", xlim=c(0,70), lwd = 2)
 lines(x=61:70, y=prediction[1,], type='l', col="blue", lwd = 2)
 # lines(x=61:70, y=prediction[1,]+2*prediction[2,], type="l", col="orange", lwd = 2)
 # lines(x=61:70, y=prediction[1,]-2*prediction[2,], type="l", col="yellow", lwd = 2)
 ```
-
-The Covid raw data along with the prediction is plotted as Figure \ref{fig:final-pred}.
