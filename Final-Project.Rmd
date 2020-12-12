@@ -47,7 +47,7 @@ plot(days, covid$New.Cases, type="l", ylab="New Cases", xlab="Days", main="COVID
 pgram <- function(x, title){
   m <- floor(length(x)/2)
   pgram <- abs(fft(x)[2:(m+1)])^2/length(x)
-  plot(pgram, type = "h", xlab="j/n", ylab="", main=title)
+  plot(pgram, type = "h", xlab="j", ylab="", main=title)
   abline(h=0)
 }
 pgram(covid$New.Cases, "Periodogram of the COVID data")
@@ -128,8 +128,16 @@ LBQPlot(model1_2$fit$residuals, title = "Ljung-Box Test of Residuals for ARMA(0,
 Since there is no evidence for anything other than the white noise, the second model is selected as MA(1) with its theoretical ACF/PACF values shown as orange circles in Figure \ref{fig:acf-pacf-signal-1}. This model captures the magnitude of ACF at lag=1 and the magnitude of PACF at lag=2 better than the first suggested model. The Ljung-Box Test of this model, marked on the bottom right in Figure \ref{fig:acf-pacf-signal-1} shows that all p-values are above the rejection threshold, which suggests that the residuals after fitting ARMA(0,1) is likely to be white noise. Moreover, the p-values are higher than those in the first suggested model. These observations imples that ARMA(0,1) might be a better fit.
 
 ## Differencing
-In addition to fitting a parametric model on the signal, differencing is also considered. The periodogram of the log transformed data shows seasonal components at frequencies of 8/60 and 9/60, which correspond to periods at 60/8=7.5 and 60/9=6.67. This might occur due to leakage where the true period is 7, which is essentially weekly effect and makes more sense. Furthermore, to remove the quadratic trend in the tranformed data, a second differencing with lag=1 is applied after the first differencing at lag=7.
-```{r signal-2, echo=FALSE, results='hide', fig.cap='Periodogram of $log(\\text{COVID}_t)$ and Residuals after differnecing. $log(\\text{COVID}_t)$ is the logarithemic transform of the COVID data.',  fig.align = 'center', fig.pos="H", fig.height=3.5, fig.width = 8, out.width="80%"}
+In addition to fitting a parametric model on the signal, differencing is also considered. The periodogram of the log transformed data shows seasonal components at frequencies of 8/60 and 9/60, which correspond to periods at 60/8=7.5 and 60/9=6.67. This might occur due to leakage where the true period is 7, which is essentially weekly effect and makes more sense. Furthermore, to remove the quadratic trend in the tranformed data, a second differencing with lag=1 is applied after the first differencing at lag=7. Thus, the differencing procedure is shown in the equation below, where $\text{COVID}_t$ represents the COVID time series data, $X_t$ represents the log transformed data, and $Y_t$ represents the filtered data after differencing.
+
+$$
+\begin{aligned}
+X_t &= log(\text{COVID}_t)\\
+Y_t &= \nabla_7 \nabla X_t\\
+&= X_t - X_{t-1} - X_{t-7} + X_{t-8}\\
+\end{aligned}
+$$
+```{r signal-2, echo=FALSE, results='hide', fig.cap='Periodogram of $log(\\text{COVID}_t)$ and Residuals after differnecing. $log(\\text{COVID}_t)$ is the logarithemic transform of the COVID data.',  fig.align = 'center', fig.pos="H", fig.height=3, fig.width = 8, out.width="80%"}
 layout(matrix(c(1,2),ncol=2))
 pgram(logY, "Periodogram of Log(Y)")
 sea_seven = diff(diff(logY, lag=7))
