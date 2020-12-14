@@ -26,7 +26,7 @@ stopifnot(k>=0, lag.max-StartLag>0, length(res)>lag.max)
 ans<-LjungBoxTest(res, k=k, lag.max=lag.max, StartLag=StartLag, SquaredQ=FALSE)
 m <- ans[,"m"]
 pv <- ans[,"pvalue"]
-plot(m, pv, xlab="lag", ylab="p-value", ylim=c(0,1), main=title)
+plot(m, pv, xlab="Lag", ylab="p-value", ylim=c(0,1), main=title)
 abline(h=0.05, col="red", lty=2)
 }
 ```
@@ -36,7 +36,7 @@ The number of new cases of COVID is expected to follow a cyclic pattern in the n
 
 # Exploratory Data Analysis
 
-In the COVID data, marked on the left in Figure \ref{fig:EDA}, the number of new cases appears to have a quadratic relationship with the time. From the periodogram, it is shown that there are seasonal components at frequencies of 1/60, 8/60, and 9/60. Since the corresponding periods 60/8 and 60/9 are not integers, this might happen due to leakage. Additionally, there appears to be heteroskedasticity in the data. The standard deviation appears to be increasing linearly with the mean, which is implying that the variance appears to be increasing quadratically with the mean.
+In the COVID data, marked on the left in Figure \ref{fig:EDA}, the number of new cases appears to have a quadratic relationship with the time. From the periodogram, COVID data is plotted on the frequency domain over index j and it is shown that there are seasonal components at frequencies of 1/60, 8/60, and 9/60. Since the corresponding periods 60/8 and 60/9 are not integers, this might happen due to leakage. Additionally, there appears to be heteroskedasticity in the data. The standard deviation appears to be increasing linearly with the mean, which is implying that the variance appears to be increasing quadratically with the mean.
 
 ```{r EDA, echo=FALSE, fig.cap="COVID New Cases and Periodogram.", fig.align = 'center', fig.height=3.5, fig.width = 8, out.width = '90%'}
 covid <- read.csv('projectdata_covid.csv')
@@ -47,7 +47,7 @@ plot(days, covid$New.Cases, type="l", ylab="New Cases", xlab="Days", main="COVID
 pgram <- function(x, title){
   m <- floor(length(x)/2)
   pgram <- abs(fft(x)[2:(m+1)])^2/length(x)
-  plot(pgram, type = "h", xlab="j", ylab="", main=title)
+  plot(pgram, type = "h", xlab="Index", ylab="", main=title)
   abline(h=0)
 }
 pgram(covid$New.Cases, "Periodogram of the COVID data")
@@ -262,12 +262,12 @@ $\theta$, $\Theta$ are coefficients which will be estimated in the next subsecti
 
 
 ## Estimation of model parameters
-Estimates of the model parameters are given in Table \ref{tab:estimatetable}.
+Estimates of the model parameters, the standard errors, and parameter descriptions are given in Table \ref{tab:estimatetable}. One interesting thing to notice is that all values are pretty small. This might happen due to the fact that the COVID data is first transformed into the log scale.
 ```{r estimatetable}
 x <- matrix(nrow = 3, ncol = 3)
 colnames(x) <- c("Estimate", "SE", "Coefficient Description")
 rownames(x) <- c("$\\theta$", "$\\Theta$", "$\\sigma_M^2$")
-x[3,1] <- model2_1$fit$sigma2
+x[3,1] <- round(model2_1$fit$sigma2, 4)
 x[3,2] <- ""
 x[,3] <- c("MA coefficient", "Seasonal MA coefficient", "Variance of White Noise")
 x[1:2,1:2] <- model2_1$ttable[1:2,1:2]
@@ -275,7 +275,7 @@ x <- kable(x, caption = 'Model Estimates', escape = FALSE)
 kable_styling(x, position = 'center', latex_options = 'HOLD_position')
 ```
 ## Prediction
-Figure \ref{fig:final-pred} shows the forecast values of COVID new cases in next 10 days in log scale and the original scale. The model predicts that the new cases will follow a cyclic pattern with a drop up to day 64, a rise up to day 66, then a drop up to day 70. The lowest point is expected to occur on day 64 with around 565 new cases, and the highest point is expected to occur on day 66 with around 1130 new cases. The trend will be slowly going upwards, which suggests that necessary measures should be taken to help reduce the spread of the virus.
+Figure \ref{fig:final-pred} shows the forecast values of COVID new cases in next 10 days in log scale and the original scale. The model predicts that the new cases will follow a cyclic pattern with a drop up to day 64, a rise up to day 66, then a drop up to day 70. According to the forecasts, the lowest point is expected to occur on day 64 with around 565 new cases, and the highest point is expected to occur on day 66 with around 1130 new cases. The trend will be slowly going upwards, which suggests that necessary measures should be taken in the Gotham city to help slow down the spread of the virus.
 
 
 ```{r, echo = FALSE, results = 'hide', fig.show = 'hide', fig.cap = 'Forecasts of COVID new cases', fig.pos = 'H', fig.width = 8, fig.height = 4, out.width = '90%'}
@@ -290,15 +290,13 @@ prediction[2,] <- exp(1)^sarima.for(xdata=logY, n.ahead=10, p=0,d=1,q=1,P=0,D=1,
 colnames(prediction) <- c("61", "62", "63", "64", "65", "66", "67", "68", "69", "70")
 rownames(prediction) <- c("Prediction", "Standard Error")
 ```
-```{r pred-table, echo = FALSE, fig.show = 'hide', results = 'hide'}
-knitr::kable(prediction,caption = "Prediction on 10 future data with log scale")
-```
+
 
 ```{r final-pred, echo = FALSE, results = 'hide', fig.cap = 'Forecasts of COVID new cases in next 10 days in log scale and original scale.', fig.align = 'center', fig.pos = 'H', fig.height = 6, fig.width = 8, out.width = '90%'}
 par(mfrow = c(2,1))
 sarima.for(logY, n.ahead = 10, p=0,d=1,q=1,P=0,D=1,Q=1,S=7)$pred
-plot(covid$New.Cases, xlab="Days", ylab="New Cases", type="l", xlim=c(0,70), lwd = 2)
-lines(x=61:70, y=prediction[1,], type='l', col="blue", lwd = 2)
+plot(covid$New.Cases, xlab="Days", ylab="New Cases", type="o", xlim=c(0,70), lwd = 2)
+lines(x=61:70, y=prediction[1,], type='o', col="blue", lwd = 2)
 grid(lwd=2)
 # lines(x=61:70, y=prediction[1,]+2*prediction[2,], type="l", col="orange", lwd = 2)
 # lines(x=61:70, y=prediction[1,]-2*prediction[2,], type="l", col="yellow", lwd = 2)
